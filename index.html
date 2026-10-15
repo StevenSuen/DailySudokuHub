@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Sudoku Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .cell-selected { background-color: #dbeafe !important; }
+    .cell-highlight { background-color: #1e293b; }
+    .cell-same-number { background-color: #334155; font-weight: bold; }
+    .cell-error { background-color: #fecdd3 !important; color: #e11d48 !important; }
+    /* Custom Scrollbar for Archive Modal */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-full flex flex-col items-center justify-between p-3 sm:p-6 select-none">
+
+  <!-- Main Application Header -->
+  <header class="w-full max-w-lg flex flex-col gap-2 mb-3">
+    <div class="flex justify-between items-center">
+      <div>
+        <h1 class="text-xl sm:text-2xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
+          Daily Sudoku Studio
+        </h1>
+        <p class="text-xs text-slate-400" id="puzzle-info">Custom Puzzle &bull; Hard</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btn-timer" class="text-xs bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-300">
+          <i class="fa-regular fa-clock text-amber-400"></i> <span id="timer-display">00:00</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Date Navigation Header (日期選單與切換列) -->
+    <div class="w-full bg-slate-800 border border-slate-700/80 rounded-xl p-1.5 flex items-center justify-between text-xs">
+      <button id="btn-prev-date" class="px-2.5 py-1.5 hover:bg-slate-700 rounded-lg text-slate-300 transition flex items-center gap-1">
+        <i class="fa-solid fa-chevron-left"></i> <span class="hidden sm:inline">Prev</span>
+      </button>
+
+      <button id="btn-open-archive" class="px-3 py-1.5 bg-slate-700/80 hover:bg-slate-700 text-amber-400 font-semibold rounded-lg flex items-center gap-2 border border-slate-600/50 transition">
+        <i class="fa-regular fa-calendar-days text-sm"></i>
+        <span id="current-date-display">2026-10-15</span>
+        <i class="fa-solid fa-caret-down text-slate-400 text-xs"></i>
+      </button>
+
+      <button id="btn-next-date" class="px-2.5 py-1.5 hover:bg-slate-700 rounded-lg text-slate-300 transition flex items-center gap-1">
+        <span class="hidden sm:inline">Next</span> <i class="fa-solid fa-chevron-right"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="w-full max-w-lg flex flex-col items-center">
+    <!-- Sudoku Grid Container -->
+    <div class="w-full aspect-square bg-slate-800 rounded-2xl p-2 sm:p-3 shadow-2xl border border-slate-700/50 mb-4">
+      <div id="sudoku-grid" class="w-full h-full grid grid-cols-9 grid-rows-9 gap-[1px] bg-slate-600 border-2 border-slate-500 rounded-lg overflow-hidden">
+        <!-- Cells generated dynamically -->
+      </div>
+    </div>
+
+    <!-- Dual Pencil Mode Indicator -->
+    <div class="w-full flex items-center justify-between bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/80 mb-3 text-xs">
+      <span class="text-slate-400 px-2 font-medium flex items-center gap-1.5">
+        <i class="fa-solid fa-pen-to-square text-amber-400"></i> Note Mode:
+      </span>
+      <div class="flex gap-1">
+        <button id="mode-normal" class="px-3 py-1 rounded-lg text-amber-400 font-medium transition active:scale-95 bg-slate-700">
+          Normal
+        </button>
+        <button id="mode-corner" class="px-3 py-1 rounded-lg text-slate-400 font-medium transition active:scale-95 hover:bg-slate-700/50">
+          Corner
+        </button>
+        <button id="mode-center" class="px-3 py-1 rounded-lg text-slate-400 font-medium transition active:scale-95 hover:bg-slate-700/50">
+          Center
+        </button>
+      </div>
+    </div>
+
+    <!-- Action Toolbar Buttons -->
+    <div class="w-full grid grid-cols-5 gap-1.5 sm:gap-2 mb-3">
+      <button id="btn-undo" class="bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl flex flex-col items-center justify-center gap-1 transition text-xs border border-slate-700">
+        <i class="fa-solid fa-rotate-left text-sm"></i> Undo
+      </button>
+      <button id="btn-erase" class="bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl flex flex-col items-center justify-center gap-1 transition text-xs border border-slate-700">
+        <i class="fa-solid fa-eraser text-sm"></i> Erase
+      </button>
+      <button id="btn-pencil" class="bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl flex flex-col items-center justify-center gap-1 transition text-xs border border-slate-700 relative">
+        <i class="fa-solid fa-pencil text-sm"></i> Notes
+        <span id="pencil-dot" class="hidden absolute top-1.5 right-2 w-2 h-2 rounded-full bg-amber-400"></span>
+      </button>
+      <button id="btn-check" class="bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl flex flex-col items-center justify-center gap-1 transition text-xs border border-slate-700">
+        <i class="fa-solid fa-check text-sm text-emerald-400"></i> Check
+      </button>
+      <button id="btn-yt" class="bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 py-2.5 rounded-xl flex flex-col items-center justify-center gap-1 transition text-xs border border-rose-800/50">
+        <i class="fa-brands fa-youtube text-sm text-rose-500"></i> Walkthrough
+      </button>
+    </div>
+
+    <!-- Numpad -->
+    <div class="w-full grid grid-cols-9 gap-1 sm:gap-2">
+      <button class="num-key bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-lg sm:text-xl py-2.5 sm:py-3 rounded-xl border border-slate-700 transition active:scale-95" data-val="1">1</button>
+      <button class="num-key bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-lg sm:text-xl py-2.5 sm:py-3 rounded-xl border border-slate-700 transition active:scale-95" data-val="2">2</button>
+      <button class="num-key bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-lg sm:text-xl py-2.5 sm:py-3 rounded-xl border border-slate-700 transition active:scale-95" data-val="3">3</button>
+      <button class="num-key bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-lg sm:text-xl py-2.5 sm:py-3 rounded-xl border border-slate-700 transition active:scale-95" data-val="4">4</button>
+      <button class="num-key bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-lg sm:text-xl py-2.5 sm:py-3 rounded-xl border border-slate-700 transition active:scale-95" data-val="5">5</button>
+      <button class="num-key bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-lg sm:text-xl py-2.5 sm:py-3 rounded-xl border border-slate-700 transition active:scale-95" data-val="6">6</button>
+      <button class="num-key bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-lg sm:text-xl py-2.5 sm:py-3 rounded-xl border border-slate-700 transition active:scale-95" data-val="7">7</button>
+      <button class="num-key bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-lg sm:text-xl py-2.5 sm:py-3 rounded-xl border border-slate-700 transition active:scale-95" data-val="8">8</button>
+      <button class="num-key bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-lg sm:text-xl py-2.5 sm:py-3 rounded-xl border border-slate-700 transition active:scale-95" data-val="9">9</button>
+    </div>
+  </main>
+
+  <footer class="w-full max-w-lg text-center text-slate-500 text-xs mt-4">
+    Hotkey Tips: <span class="text-slate-400 font-mono bg-slate-800 px-1 rounded">1-9</span> Fill &bull; 
+    <span class="text-slate-400 font-mono bg-slate-800 px-1 rounded">N</span> Toggle Notes &bull; 
+    <span class="text-slate-400 font-mono bg-slate-800 px-1 rounded">C</span> Corner/Center Switch
+  </footer>
+
+  <!-- Date Archive Selection Modal (歷史題目選單彈窗) -->
+  <div id="modal-archive" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 max-w-md w-full shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-700">
+        <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+          <i class="fa-regular fa-calendar-check text-amber-400"></i> Select Puzzle Date
+        </h3>
+        <button id="archive-close" class="text-slate-400 hover:text-slate-100 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Archive Puzzle List Container -->
+      <div id="archive-list" class="flex-1 overflow-y-auto space-y-2 pr-1">
+        <!-- Dynamic Date Entries -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Win Modal Component -->
+  <div id="modal-success" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+      <div class="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+        <i class="fa-solid fa-trophy"></i>
+      </div>
+      <h3 class="text-xl font-bold text-slate-100 mb-2">Congratulations!</h3>
+      <p class="text-slate-300 text-sm mb-6">You successfully solved today's custom Sudoku puzzle!</p>
+      <button id="modal-close" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold py-3 rounded-xl hover:opacity-90 transition">
+        Awesome!
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Database of Daily Original Puzzles (以日期為 Key 的歷史題目資料庫)
+    const PUZZLE_DATABASE = {
+      "2026-10-15": {
+        id: "003",
+        date: "2026-10-15",
+        title: "X-Wing Showcase",
+        difficulty: "Hard",
+        ytUrl: "https://www.youtube.com",
+        initialGrid: [
+          [0, 0, 0, 2, 6, 0, 7, 0, 1],
+          [6, 8, 0, 0, 7, 0, 0, 9, 0],
+          [1, 9, 0, 0, 0, 4, 5, 0, 0],
+          [8, 2, 0, 1, 0, 0, 0, 4, 0],
+          [0, 0, 4, 6, 0, 2, 9, 0, 0],
+          [0, 5, 0, 0, 0, 3, 0, 2, 8],
+          [0, 0, 9, 3, 0, 0, 0, 7, 4],
+          [0, 4, 0, 0, 5, 0, 0, 3, 6],
+          [7, 0, 3, 0, 1, 8, 0, 0, 0]
+        ],
+        solutionGrid: [
+          [4, 3, 5, 2, 6, 9, 7, 8, 1],
+          [6, 8, 2, 5, 7, 1, 4, 9, 3],
+          [1, 9, 7, 8, 3, 4, 5, 6, 2],
+          [8, 2, 6, 1, 9, 5, 3, 4, 7],
+          [3, 7, 4, 6, 8, 2, 9, 1, 5],
+          [9, 5, 1, 7, 4, 3, 6, 2, 8],
+          [5, 1, 9, 3, 2, 6, 8, 7, 4],
+          [2, 4, 8, 9, 5, 7, 1, 3, 6],
+          [7, 6, 3, 4, 1, 8, 2, 5, 9]
+        ]
+      },
+      "2026-10-14": {
+        id: "002",
+        date: "2026-10-14",
+        title: "Hidden Pairs Logic",
+        difficulty: "Medium",
+        ytUrl: "https://www.youtube.com",
+        initialGrid: [
+          [1, 0, 0, 0, 0, 7, 0, 9, 0],
+          [0, 3, 0, 0, 2, 0, 0, 0, 8],
+          [0, 0, 9, 6, 0, 0, 5, 0, 0],
+          [0, 0, 5, 3, 0, 0, 9, 0, 0],
+          [0, 1, 0, 0, 8, 0, 0, 0, 2],
+          [6, 0, 0, 0, 0, 4, 0, 0, 0],
+          [3, 0, 0, 0, 0, 0, 1, 2, 0],
+          [0, 4, 0, 0, 0, 0, 0, 0, 7],
+          [0, 0, 7, 0, 0, 0, 0, 0, 0]
+        ],
+        solutionGrid: [
+          [1, 5, 2, 8, 4, 7, 3, 9, 6],
+          [7, 3, 6, 5, 2, 9, 4, 1, 8],
+          [4, 8, 9, 6, 1, 3, 5, 7, 2],
+          [8, 2, 5, 3, 7, 1, 9, 6, 4],
+          [9, 1, 4, 2, 8, 6, 7, 3, 2],
+          [6, 7, 3, 9, 5, 4, 2, 8, 1],
+          [3, 9, 8, 7, 6, 5, 1, 2, 4],
+          [2, 4, 1, 8, 3, 2, 6, 5, 7],
+          [5, 6, 7, 4, 9, 1, 8, 4, 3]
+        ]
+      },
+      "2026-10-13": {
+        id: "001",
+        date: "2026-10-13",
+        title: "Premier Launch Puzzle",
+        difficulty: "Hard",
+        ytUrl: "https://www.youtube.com",
+        initialGrid: [
+          [0, 2, 0, 6, 0, 8, 0, 0, 0],
+          [5, 8, 0, 0, 0, 9, 7, 0, 0],
+          [0, 0, 0, 0, 4, 0, 0, 0, 0],
+          [3, 7, 0, 0, 0, 0, 5, 0, 0],
+          [6, 0, 0, 0, 0, 0, 0, 0, 4],
+          [0, 0, 8, 0, 0, 0, 0, 1, 3],
+          [0, 0, 0, 0, 2, 0, 0, 0, 0],
+          [0, 0, 9, 8, 0, 0, 0, 3, 6],
+          [0, 0, 0, 3, 0, 6, 0, 9, 0]
+        ],
+        solutionGrid: [
+          [1, 2, 4, 6, 7, 8, 3, 5, 9],
+          [5, 8, 3, 1, 9, 2, 7, 4, 6],
+          [9, 6, 7, 5, 4, 3, 8, 2, 1],
+          [3, 7, 1, 4, 6, 9, 5, 8, 2],
+          [6, 9, 2, 7, 8, 1, 4, 3, 5],
+          [4, 5, 8, 2, 3, 5, 9, 1, 3],
+          [8, 3, 6, 9, 2, 4, 1, 7, 5],
+          [2, 4, 9, 8, 1, 7, 5, 3, 6],
+          [7, 1, 5, 3, 5, 6, 2, 9, 8]
+        ]
+      }
+    };
+
+    // State Variables
+    let currentDateKey = "2026-10-15";
+    let activePuzzle = PUZZLE_DATABASE[currentDateKey];
+    let selectedCell = null; // {row, col}
+    let boardState = [];     // 9x9 current board numbers
+    let cornerMarks = [];    // 9x9 array of arrays
+    let centerMarks = [];    // 9x9 array of arrays
+    let noteMode = 'normal'; // 'normal', 'corner', or 'center'
+    let history = [];
+    let timerSeconds = 0;
+    let timerInterval = null;
+
+    function loadPuzzleByDate(dateKey) {
+      if (!PUZZLE_DATABASE[dateKey]) return;
+      currentDateKey = dateKey;
+      activePuzzle = PUZZLE_DATABASE[dateKey];
+
+      // Reset Board and Timer
+      selectedCell = null;
+      history = [];
+      boardState = JSON.parse(JSON.stringify(activePuzzle.initialGrid));
+      cornerMarks = Array.from({ length: 9 }, () => Array.from({ length: 9 }, () => []));
+      centerMarks = Array.from({ length: 9 }, () => Array.from({ length: 9 }, () => []));
+
+      document.getElementById('current-date-display').innerText = activePuzzle.date;
+      document.getElementById('puzzle-info').innerText = `${activePuzzle.title} • ${activePuzzle.difficulty}`;
+
+      resetTimer();
+      renderBoardGrid();
+      updateBoardDisplay();
+    }
+
+    function renderBoardGrid() {
+      const gridElem = document.getElementById('sudoku-grid');
+      gridElem.innerHTML = '';
+
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          const cell = document.createElement('div');
+          
+          let borderStyle = 'border-slate-700/60 ';
+          if (c % 3 === 2 && c !== 8) borderStyle += 'border-r-2 border-r-slate-400 ';
+          if (r % 3 === 2 && r !== 8) borderStyle += 'border-b-2 border-b-slate-400 ';
+
+          cell.className = `w-full h-full bg-slate-900 flex items-center justify-center cursor-pointer relative transition-colors duration-150 ${borderStyle}`;
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          
+          cell.addEventListener('click', () => selectCell(r, c));
+          gridElem.appendChild(cell);
+        }
+      }
+    }
+
+    function updateBoardDisplay() {
+      const cells = document.querySelectorAll('#sudoku-grid > div');
+      const selectedVal = selectedCell ? boardState[selectedCell.row][selectedCell.col] : null;
+
+      cells.forEach(cell => {
+        const r = parseInt(cell.dataset.row);
+        const c = parseInt(cell.dataset.col);
+        const val = boardState[r][c];
+        const isGiven = activePuzzle.initialGrid[r][c] !== 0;
+
+        cell.className = cell.className.replace(/cell-[a-z-]+/g, '').trim();
+
+        // Highlight Selected & Related Cells
+        if (selectedCell) {
+          if (selectedCell.row === r && selectedCell.col === c) {
+            cell.classList.add('cell-selected');
+          } else if (selectedCell.row === r || selectedCell.col === c || (Math.floor(selectedCell.row/3) === Math.floor(r/3) && Math.floor(selectedCell.col/3) === Math.floor(c/3))) {
+            cell.classList.add('cell-highlight');
+          }
+          if (selectedVal && val === selectedVal && val !== 0) {
+            cell.classList.add('cell-same-number');
+          }
+        }
+
+        // Render Normal Numbers or Pencil Marks
+        if (val !== 0) {
+          cell.innerHTML = `<span class="text-xl sm:text-2xl font-bold ${isGiven ? 'text-slate-100' : 'text-amber-400'}">${val}</span>`;
+        } else {
+          let hasCorner = cornerMarks[r][c].length > 0;
+          let hasCenter = centerMarks[r][c].length > 0;
+
+          if (hasCorner || hasCenter) {
+            let overlayHtml = '<div class="w-full h-full relative pointer-events-none p-0.5">';
+
+            // Corner Marks Grid
+            if (hasCorner) {
+              overlayHtml += '<div class="grid grid-cols-3 grid-rows-3 w-full h-full absolute inset-0 p-0.5">';
+              for (let i = 1; i <= 9; i++) {
+                if (cornerMarks[r][c].includes(i)) {
+                  overlayHtml += `<div class="text-[8px] sm:text-[10px] leading-none text-slate-400 flex items-center justify-center font-medium">${i}</div>`;
+                } else {
+                  overlayHtml += '<div></div>';
+                }
+              }
+              overlayHtml += '</div>';
+            }
+
+            // Center Marks Overlay
+            if (hasCenter) {
+              const sortedCenter = [...centerMarks[r][c]].sort((a,b) => a - b).join('');
+              overlayHtml += `<div class="w-full h-full absolute inset-0 flex items-center justify-center text-[10px] sm:text-[12px] leading-none text-sky-400 font-semibold tracking-tighter">${sortedCenter}</div>`;
+            }
+
+            overlayHtml += '</div>';
+            cell.innerHTML = overlayHtml;
+          } else {
+            cell.innerHTML = '';
+          }
+        }
+      });
+    }
+
+    function selectCell(r, c) {
+      selectedCell = { row: r, col: c };
+      updateBoardDisplay();
+    }
+
+    function setNoteMode(mode) {
+      noteMode = mode;
+      const normalBtn = document.getElementById('mode-normal');
+      const cornerBtn = document.getElementById('mode-corner');
+      const centerBtn = document.getElementById('mode-center');
+      const pencilDot = document.getElementById('pencil-dot');
+      const pencilBtn = document.getElementById('btn-pencil');
+
+      [normalBtn, cornerBtn, centerBtn].forEach(b => {
+        b.className = "px-3 py-1 rounded-lg text-slate-400 font-medium transition active:scale-95 hover:bg-slate-700/50";
+      });
+
+      if (mode === 'normal') {
+        normalBtn.className = "px-3 py-1 rounded-lg text-amber-400 font-medium bg-slate-700";
+        pencilDot.classList.add('hidden');
+        pencilBtn.classList.remove('border-amber-400');
+      } else if (mode === 'corner') {
+        cornerBtn.className = "px-3 py-1 rounded-lg text-amber-400 font-medium bg-slate-700";
+        pencilDot.classList.remove('hidden');
+        pencilBtn.classList.add('border-amber-400');
+      } else if (mode === 'center') {
+        centerBtn.className = "px-3 py-1 rounded-lg text-sky-400 font-medium bg-slate-700";
+        pencilDot.classList.remove('hidden');
+        pencilBtn.classList.add('border-amber-400');
+      }
+    }
+
+    function handleInput(num) {
+      if (!selectedCell) return;
+      const { row, col } = selectedCell;
+
+      if (activePuzzle.initialGrid[row][col] !== 0) return;
+
+      saveHistory();
+
+      if (noteMode === 'corner') {
+        boardState[row][col] = 0;
+        toggleCandidate(cornerMarks[row][col], num);
+      } else if (noteMode === 'center') {
+        boardState[row][col] = 0;
+        toggleCandidate(centerMarks[row][col], num);
+      } else {
+        boardState[row][col] = boardState[row][col] === num ? 0 : num;
+        cornerMarks[row][col] = [];
+        centerMarks[row][col] = [];
+        checkWinCondition();
+      }
+
+      updateBoardDisplay();
+    }
+
+    function toggleCandidate(arr, num) {
+      const idx = arr.indexOf(num);
+      if (idx > -1) arr.splice(idx, 1);
+      else arr.push(num);
+    }
+
+    function eraseCell() {
+      if (!selectedCell) return;
+      const { row, col } = selectedCell;
+      if (activePuzzle.initialGrid[row][col] !== 0) return;
+
+      saveHistory();
+      boardState[row][col] = 0;
+      cornerMarks[row][col] = [];
+      centerMarks[row][col] = [];
+      updateBoardDisplay();
+    }
+
+    function saveHistory() {
+      history.push({
+        board: JSON.parse(JSON.stringify(boardState)),
+        corner: JSON.parse(JSON.stringify(cornerMarks)),
+        center: JSON.parse(JSON.stringify(centerMarks))
+      });
+    }
+
+    function undo() {
+      if (history.length === 0) return;
+      const last = history.pop();
+      boardState = last.board;
+      cornerMarks = last.corner;
+      centerMarks = last.center;
+      updateBoardDisplay();
+    }
+
+    function checkBoard() {
+      const cells = document.querySelectorAll('#sudoku-grid > div');
+      cells.forEach(cell => {
+        const r = parseInt(cell.dataset.row);
+        const c = parseInt(cell.dataset.col);
+        const val = boardState[r][c];
+
+        if (val !== 0 && val !== activePuzzle.solutionGrid[r][c]) {
+          cell.classList.add('cell-error');
+        }
+      });
+    }
+
+    function checkWinCondition() {
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (boardState[r][c] !== activePuzzle.solutionGrid[r][c]) return;
+        }
+      }
+      clearInterval(timerInterval);
+      document.getElementById('modal-success').classList.remove('hidden');
+      document.getElementById('modal-success').classList.add('flex');
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      timerSeconds = 0;
+      document.getElementById('timer-display').innerText = "00:00";
+      timerInterval = setInterval(() => {
+        timerSeconds++;
+        const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+        const secs = String(timerSeconds % 60).padStart(2, '0');
+        document.getElementById('timer-display').innerText = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    function populateArchiveModal() {
+      const archiveList = document.getElementById('archive-list');
+      archiveList.innerHTML = '';
+
+      const keys = Object.keys(PUZZLE_DATABASE).sort().reverse();
+      keys.forEach(date => {
+        const item = PUZZLE_DATABASE[date];
+        const isSelected = date === currentDateKey;
+
+        const el = document.createElement('div');
+        el.className = `p-3 rounded-xl border flex items-center justify-between cursor-pointer transition ${isSelected ? 'bg-amber-500/10 border-amber-500' : 'bg-slate-700/40 border-slate-700 hover:bg-slate-700/80'}`;
+        el.innerHTML = `
+          <div>
+            <div class="text-xs font-semibold ${isSelected ? 'text-amber-400' : 'text-slate-200'}">${item.date}</div>
+            <div class="text-xs text-slate-400">${item.title}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-medium">${item.difficulty}</span>
+            <i class="fa-solid fa-chevron-right text-xs text-slate-500"></i>
+          </div>
+        `;
+        el.addEventListener('click', () => {
+          loadPuzzleByDate(date);
+          document.getElementById('modal-archive').classList.add('hidden');
+          document.getElementById('modal-archive').classList.remove('flex');
+        });
+        archiveList.appendChild(el);
+      });
+    }
+
+    function navigateDate(offset) {
+      const keys = Object.keys(PUZZLE_DATABASE).sort();
+      const currentIdx = keys.indexOf(currentDateKey);
+      if (currentIdx !== -1 && keys[currentIdx + offset]) {
+        loadPuzzleByDate(keys[currentIdx + offset]);
+      }
+    }
+
+    // Event Listeners Registration
+    document.querySelectorAll('.num-key').forEach(btn => {
+      btn.addEventListener('click', () => handleInput(parseInt(btn.dataset.val)));
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key >= '1' && e.key <= '9') handleInput(parseInt(e.key));
+      if (e.key === 'Backspace' || e.key === 'Delete') eraseCell();
+      if (e.key.toLowerCase() === 'n' || e.key.toLowerCase() === 'p') setNoteMode(noteMode === 'normal' ? 'corner' : 'normal');
+      if (e.key.toLowerCase() === 'c') setNoteMode(noteMode === 'corner' ? 'center' : 'corner');
+    });
+
+    document.getElementById('mode-normal').addEventListener('click', () => setNoteMode('normal'));
+    document.getElementById('mode-corner').addEventListener('click', () => setNoteMode('corner'));
+    document.getElementById('mode-center').addEventListener('click', () => setNoteMode('center'));
+
+    document.getElementById('btn-pencil').addEventListener('click', () => {
+      if (noteMode === 'normal') setNoteMode('corner');
+      else if (noteMode === 'corner') setNoteMode('center');
+      else setNoteMode('normal');
+    });
+
+    document.getElementById('btn-undo').addEventListener('click', undo);
+    document.getElementById('btn-erase').addEventListener('click', eraseCell);
+    document.getElementById('btn-check').addEventListener('click', checkBoard);
+    document.getElementById('btn-yt').addEventListener('click', () => {
+      window.open(activePuzzle.ytUrl, '_blank');
+    });
+
+    document.getElementById('btn-prev-date').addEventListener('click', () => navigateDate(-1));
+    document.getElementById('btn-next-date').addEventListener('click', () => navigateDate(1));
+
+    document.getElementById('btn-open-archive').addEventListener('click', () => {
+      populateArchiveModal();
+      document.getElementById('modal-archive').classList.remove('hidden');
+      document.getElementById('modal-archive').classList.add('flex');
+    });
+
+    document.getElementById('archive-close').addEventListener('click', () => {
+      document.getElementById('modal-archive').classList.add('hidden');
+      document.getElementById('modal-archive').classList.remove('flex');
+    });
+
+    document.getElementById('modal-close').addEventListener('click', () => {
+      document.getElementById('modal-success').classList.add('hidden');
+    });
+
+    // Start App Initialization
+    window.onload = () => {
+      loadPuzzleByDate("2026-10-15");
+    };
+  </script>
+</body>
+</html>
